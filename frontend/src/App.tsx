@@ -1,0 +1,281 @@
+import { useState, useEffect, useCallback } from 'react'
+import { api, Task, TaskCreate, TaskUpdate } from './api'
+import TaskModal from './TaskModal'
+import ConfirmDialog from './ConfirmDialog'
+
+type StatusFilter = '' | 'todo' | 'in_progress' | 'review' | 'done'
+type ToastType = 'success' | 'error'
+
+interface Toast {
+  id: number;
+  message: string;
+  type: ToastType;
+}
+
+let toastId = 0;
+
+export default function App() {
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Task | null>(null)
+  const [toasts, setToasts] = useState<Toast[]>([])
+
+  const showToast = useCallback((message: string, type: ToastType = 'success') => {
+    const id = ++toastId
+    setToasts(prev => [...prev, { id, message, type }])
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000)
+  }, [])
+
+  const loadTasks = useCallback(async () => {
+    try {
+      setLoading(true)
+      const params: { status?: string } = {}
+      if (statusFilter) params.status = statusFilter
+      const data = await api.listTasks(params)
+      setTasks(data)
+    } catch (err: any) {
+      showToast(err.message || 'Failed to load tasks', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }, [statusFilter, showToast])
+
+  useEffect(() => { loadTasks() }, [loadTasks])
+
+  const handleCreate = async (data: TaskCreate | TaskUpdate) => {
+    await api.createTask(data as TaskCreate)
+    showToast('Task created successfully')
+    setModalOpen(false)
+    loadTasks()
+  }
+
+  const handleUpdate = async (data: TaskCreate | TaskUpdate) => {
+    if (!editingTask) return
+    await api.updateTask(editingTask.id, data as TaskUpdate)
+    showToast('Task updated successfully')
+    setEditingTask(null)
+    loadTasks()
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    await api.deleteTask(deleteTarget.id)
+    showToast('Task deleted')
+    setDeleteTarget(null)
+    loadTasks()
+  }
+
+  const handleQuickStatusChange = async (task: Task, newStatus: Task['status']) => {
+    await api.updateTask(task.id, { status: newStatus })
+    showToast(`Moved to ${newStatus.replace('_', ' ')}`)
+    loadTasks()
+  }
+
+  // Filter tasks client-side by search query
+  const filteredTasks = tasks.filter(t => {
+    if (!searchQuery) return true
+    const q = searchQuery.toLowerCase()
+    return (
+      t.title.toLowerCase().includes(q) ||
+      (t.description || '').toLowerCase().includes(q) ||
+      t.tags.some(tag => tag.toLowerCase().includes(q)) ||
+      (t.assignee || '').toLowerCase().includes(q)
+    )
+  })
+
+  // Stats
+  const stats = {
+    todo: tasks.filter(t => t.status === 'todo').length,
+    in_progress: tasks.filter(t => t.status === 'in_progress').length,
+    review: tasks.filter(t => t.status === 'review').length,
+    done: tasks.filter(t => t.status === 'done').length,
+  }
+
+  const statusFilters: { value: StatusFilter; label: string }[] = [
+    { value: '', label: 'All' },
+    { value: 'todo', label: 'To Do' },
+    { value: 'in_progress', label: 'In Progress' },
+    { value: 'review', label: 'Review' },
+    { value: 'done', label: 'Done' },
+  ]
+
+  const formatDate = (iso: string) => {
+    const d = new Date(iso)
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  return (
+    <div className="app-container">
+      {/* Header */}
+      <header className="app-header" id="app-header">
+        <div className="app-logo">
+          <div className="app-logo-icon">⚡</div>
+          <div>
+            <h1>TaskFlow</h1>
+            <span>Manage your tasks with clarity</span>
+          </div>
+        </div>
+        <div className="header-actions">
+          <button
+            id="btn-new-task"
+            className="btn btn-primary"
+            onClick={() => { setEditingTask(null); setModalOpen(true) }}
+          >
+            ✚ New Task
+          </button>
+        </div>
+      </header>
+
+      {/* Stats */}
+      <div className="stats-bar" id="stats-bar">
+        <div className="stat-card todo">
+          <span className="stat-value">{stats.todo}</span>
+          <span className="stat-label">To Do</span>
+        </div>
+        <div className="stat-card in-progress">
+          <span className="stat-value">{stats.in_progress}</span>
+          <span className="stat-label">In Progress</span>
+        </div>
+        <div className="stat-card review">
+          <span className="stat-value">{stats.review}</span>
+          <span className="stat-label">Review</span>
+        </div>
+        <div className="stat-card done">
+          <span className="stat-value">{stats.done}</span>
+          <span className="stat-label">Done</span>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="toolbar" id="toolbar">
+        <div className="search-box">
+          <span className="search-icon">🔍</span>
+          <input
+            id="search-input"
+            type="text"
+            placeholder="Search tasks..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <div className="filter-group">
+          {statusFilters.map(f => (
+            <button
+              key={f.value}
+              className={`filter-btn ${statusFilter === f.value ? 'active' : ''}`}
+              onClick={() => setStatusFilter(f.value)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Task List */}
+      {loading ? (
+        <div className="loading-spinner"><div className="spinner" /></div>
+      ) : filteredTasks.length === 0 ? (
+        <div className="empty-state" id="empty-state">
+          <div className="empty-state-icon">📋</div>
+          <h3>No tasks found</h3>
+          <p>
+            {searchQuery || statusFilter
+              ? 'Try adjusting your filters or search query.'
+              : 'Create your first task to get started!'}
+          </p>
+        </div>
+      ) : (
+        <div className="task-list" id="task-list">
+          {filteredTasks.map(task => (
+            <div
+              key={task.id}
+              className={`task-card priority-${task.priority} status-${task.status}`}
+              onClick={() => { setEditingTask(task); setModalOpen(true) }}
+            >
+              <div className="task-card-header">
+                <span className="task-title">{task.title}</span>
+                <div className="task-actions" onClick={e => e.stopPropagation()}>
+                  {task.status !== 'done' && (
+                    <button
+                      className="btn btn-ghost btn-sm btn-icon"
+                      title="Mark as done"
+                      onClick={() => handleQuickStatusChange(task, 'done')}
+                    >
+                      ✓
+                    </button>
+                  )}
+                  {task.status === 'done' && (
+                    <button
+                      className="btn btn-ghost btn-sm btn-icon"
+                      title="Reopen"
+                      onClick={() => handleQuickStatusChange(task, 'todo')}
+                    >
+                      ↩
+                    </button>
+                  )}
+                  <button
+                    className="btn btn-danger btn-sm btn-icon"
+                    title="Delete"
+                    onClick={() => setDeleteTarget(task)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+              {task.description && (
+                <p className="task-description">{task.description}</p>
+              )}
+              <div className="task-meta">
+                <span className={`task-badge badge-priority-${task.priority}`}>
+                  {task.priority}
+                </span>
+                <span className={`badge-status badge-status-${task.status}`}>
+                  {task.status.replace('_', ' ')}
+                </span>
+                {task.assignee && (
+                  <span className="task-tag">👤 {task.assignee}</span>
+                )}
+                {task.tags.map(tag => (
+                  <span key={tag} className="task-tag">{tag}</span>
+                ))}
+                <span className="task-date">{formatDate(task.created_at)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create / Edit Modal */}
+      {modalOpen && (
+        <TaskModal
+          task={editingTask}
+          onClose={() => { setModalOpen(false); setEditingTask(null) }}
+          onSubmit={editingTask ? handleUpdate : handleCreate}
+        />
+      )}
+
+      {/* Delete Confirmation */}
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete Task"
+          message={`Are you sure you want to delete "${deleteTarget.title}"? This action cannot be undone.`}
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {/* Toasts */}
+      <div className="toast-container">
+        {toasts.map(t => (
+          <div key={t.id} className={`toast ${t.type}`}>
+            {t.type === 'success' ? '✓' : '✕'} {t.message}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}

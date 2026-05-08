@@ -1,0 +1,35 @@
+"""
+TaskFlow - FastAPI Application Entrypoint
+"""
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.config import settings
+from api.tasks import router as tasks_router
+
+app = FastAPI(
+    title="TaskFlow API",
+    description="A modern task management API built with FastAPI and Firestore",
+    version="1.0.0",
+)
+
+# ── CORS ──────────────────────────────────────────────────────────────────────
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ── Routers ───────────────────────────────────────────────────────────────────
+app.include_router(tasks_router)
+
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "service": "taskflow-api",
+        "project": settings.PROJECT_ID,
+    }
