@@ -61,11 +61,20 @@ def list_tasks(
     if priority:
         query = query.where(filter=FieldFilter("priority", "==", priority))
 
-    query = query.order_by("created_at", direction="DESCENDING")
-    query = query.offset(offset).limit(limit)
+    # Firestore requires composite indexes for where() + order_by().
+    # If the index doesn't exist yet, fall back to client-side sort.
+    try:
+        ordered_query = query.order_by("created_at", direction="DESCENDING")
+        ordered_query = ordered_query.offset(offset).limit(limit)
+        docs = list(ordered_query.stream())
+    except Exception:
+        # Composite index not available — fetch without ordering, sort in Python
+        unordered_query = query.offset(offset).limit(limit)
+        docs = list(unordered_query.stream())
+        docs.sort(key=lambda d: d.to_dict().get("created_at", ""), reverse=True)
 
     results = []
-    for doc in query.stream():
+    for doc in docs:
         d = doc.to_dict()
         results.append(TaskResponse(id=doc.id, **d))
     return results
