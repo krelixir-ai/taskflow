@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, Task, TaskCreate, TaskUpdate } from './api'
 import TaskModal from './TaskModal'
 import ConfirmDialog from './ConfirmDialog'
@@ -24,6 +24,13 @@ export default function App() {
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
 
+  // State for inline editing
+  const [editingInlineTaskId, setEditingInlineTaskId] = useState<string | null>(null);
+  const [inlineEditField, setInlineEditField] = useState<'title' | 'description' | null>(null);
+  const [inlineEditValue, setInlineEditValue] = useState('');
+  const inlineEditInputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+
+
   const showToast = useCallback((message: string, type: ToastType = 'success') => {
     const id = ++toastId
     setToasts(prev => [...prev, { id, message, type }])
@@ -45,6 +52,14 @@ export default function App() {
   }, [statusFilter, showToast])
 
   useEffect(() => { loadTasks() }, [loadTasks])
+
+  // Auto-focus inline edit input when it appears
+  useEffect(() => {
+    if (editingInlineTaskId && inlineEditInputRef.current) {
+      inlineEditInputRef.current.focus();
+    }
+  }, [editingInlineTaskId]);
+
 
   const handleCreate = async (data: TaskCreate | TaskUpdate) => {
     await api.createTask(data as TaskCreate)
@@ -74,6 +89,55 @@ export default function App() {
     showToast(`Moved to ${newStatus.replace('_', ' ')}`)
     loadTasks()
   }
+
+  // Inline editing handlers
+  const startInlineEdit = (task: Task, field: 'title' | 'description') => {
+    setEditingInlineTaskId(task.id);
+    setInlineEditField(field);
+    setInlineEditValue(field === 'title' ? task.title : task.description || '');
+  };
+
+  const handleInlineEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setInlineEditValue(e.target.value);
+  };
+
+  const handleInlineEditSave = async (task: Task) => {
+    if (!editingInlineTaskId || !inlineEditField) return;
+
+    const trimmedValue = inlineEditValue.trim();
+    if (!trimmedValue && inlineEditField === 'title') {
+      showToast('Title cannot be empty', 'error');
+      return;
+    }
+
+    try {
+      await api.updateTask(task.id, { [inlineEditField]: trimmedValue });
+      showToast(`${inlineEditField} updated successfully`);
+      setEditingInlineTaskId(null);
+      setInlineEditField(null);
+      setInlineEditValue('');
+      loadTasks(); // Reload to reflect changes
+    } catch (err: any) {
+      showToast(err.message || `Failed to update ${inlineEditField}`, 'error');
+    }
+  };
+
+  const handleInlineEditCancel = () => {
+    setEditingInlineTaskId(null);
+    setInlineEditField(null);
+    setInlineEditValue('');
+  };
+
+  const handleInlineEditKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>, task: Task) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleInlineEditSave(task);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleInlineEditCancel();
+    }
+  };
+
 
   // Filter tasks client-side by search query
   const filteredTasks = tasks.filter(t => {
@@ -194,10 +258,34 @@ export default function App() {
             <div
               key={task.id}
               className={`task-card priority-${task.priority} status-${task.status}`}
-              onClick={() => { setEditingTask(task); setModalOpen(true) }}
+              onClick={() => {
+                // Only open modal if not currently inline editing this task
+                if (editingInlineTaskId !== task.id) {
+                  setEditingTask(task);
+                  setModalOpen(true);
+                }
+              }}
             >
               <div className="task-card-header">
-                <span className="task-title">{task.title}</span>
+                {editingInlineTaskId === task.id && inlineEditField === 'title' ? (
+                  <input
+                    ref={inlineEditInputRef as React.RefObject<HTMLInputElement>}
+                    type="text"
+                    value={inlineEditValue}
+                    onChange={handleInlineEditChange}
+                    onBlur={() => handleInlineEditSave(task)}
+                    onKeyDown={(e) => handleInlineEditKeyDown(e, task)}
+                    className="inline-edit-input"
+                    onClick={e => e.stopPropagation()} // Prevent modal from opening
+                  />
+                ) : (
+                  <span
+                    className="task-title"
+                    onDoubleClick={(e) => { e.stopPropagation(); startInlineEdit(task, 'title'); }}
+                  >
+                    {task.title}
+                  </span>
+                )}
                 <div className="task-actions" onClick={e => e.stopPropagation()}>
                   {task.status !== 'done' && (
                     <button
@@ -227,7 +315,24 @@ export default function App() {
                 </div>
               </div>
               {task.description && (
-                <p className="task-description">{task.description}</p>
+                editingInlineTaskId === task.id && inlineEditField === 'description' ? (
+                  <textarea
+                    ref={inlineEditInputRef as React.RefObject<HTMLTextAreaElement>}
+                    value={inlineEditValue}
+                    onChange={handleInlineEditChange}
+                    onBlur={() => handleInlineEditSave(task)}
+                    onKeyDown={(e) => handleInlineEditKeyDown(e, task)}
+                    className="inline-edit-textarea"
+                    onClick={e => e.stopPropagation()} // Prevent modal from opening
+                  />
+                ) : (
+                  <p
+                    className="task-description"
+                    onDoubleClick={(e) => { e.stopPropagation(); startInlineEdit(task, 'description'); }}
+                  >
+                    {task.description}
+                  </p>
+                )
               )}
               <div className="task-meta">
                 <span className={`task-badge badge-priority-${task.priority}`}>

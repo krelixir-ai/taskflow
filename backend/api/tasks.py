@@ -39,7 +39,10 @@ async def api_get_task(task_id: str):
 
 @router.put("/{task_id}", response_model=TaskResponse)
 async def api_update_task(task_id: str, payload: TaskUpdate):
-    """Update (partial) an existing task."""
+    """
+    Update (partial) an existing task.
+    Supports updating fields like title, description, priority, status, assignee, tags, and due_date.
+    """
     task = update_task(task_id, payload)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")

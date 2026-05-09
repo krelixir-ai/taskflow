@@ -496,7 +496,7 @@ body {
 }
 .badge-status-in_progress {
   background: rgba(108, 92, 231, 0.2);
-  color: var(--status-in-progress);
+  color: var(--status-in_progress);
 }
 .badge-status-review {
   background: rgba(253, 203, 110, 0.2);
@@ -531,6 +531,38 @@ body {
 .task-card:hover .task-actions {
   opacity: 1;
 }
+
+/* Inline Edit Styles */
+.inline-edit-input,
+.inline-edit-textarea {
+  background: var(--bg-input);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: inherit;
+  outline: none;
+  padding: 4px 8px;
+  font-size: 1rem; /* Match task-title */
+  font-weight: 600; /* Match task-title */
+  line-height: 1.4;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color var(--transition-fast);
+}
+
+.inline-edit-textarea {
+  font-size: 0.85rem; /* Match task-description */
+  font-weight: 400;
+  min-height: 40px; /* Adjust as needed */
+  resize: vertical;
+}
+
+.inline-edit-input:focus,
+.inline-edit-textarea:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
 
 /* ── Modal ────────────────────────────────────────────────────────── */
 .modal-overlay {
@@ -824,7 +856,7 @@ body {
 }
 
 .toast.success { border-left: 3px solid var(--success); }
-.toast.error { border-left: 3px solid var(--danger); }
+.toast.error { border-left: 33px solid var(--danger); }
 
 @keyframes toastIn {
   from {
