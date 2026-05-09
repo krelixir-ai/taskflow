@@ -425,7 +425,7 @@ export default function App() {
 
       {/* New: Footer with API Version */}
       <footer className="app-footer">
-        TaskFlow Frontend v0.0.1 {apiVersion && ` | API v${apiVersion}`}
+        TaskFlow Frontend v0.0.2 {apiVersion && ` | API v${apiVersion}`}
       </footer>
     </div>
   )
