@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { api, Task, TaskCreate, TaskUpdate } from './api'
+import { api, Task, TaskCreate, TaskUpdate, ApiVersionResponse } from './api' // Import ApiVersionResponse
 import TaskModal from './TaskModal'
 import ConfirmDialog from './ConfirmDialog'
 import TaskDetailModal from './TaskDetailModal' // Import the new detail modal
@@ -25,6 +25,7 @@ export default function App() {
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null)
   const [viewingTask, setViewingTask] = useState<Task | null>(null) // New state for Detail Modal
   const [toasts, setToasts] = useState<Toast[]>([])
+  const [apiVersion, setApiVersion] = useState<string | null>(null); // New state for API version
 
   // State for inline editing
   const [editingInlineTaskId, setEditingInlineTaskId] = useState<string | null>(null);
@@ -54,6 +55,20 @@ export default function App() {
   }, [statusFilter, showToast])
 
   useEffect(() => { loadTasks() }, [loadTasks])
+
+  // New: Fetch API version on component mount
+  useEffect(() => {
+    const fetchApiVersion = async () => {
+      try {
+        const response = await api.getApiVersion();
+        setApiVersion(response.version);
+      } catch (err) {
+        console.error("Failed to fetch API version:", err);
+        // Optionally show a toast, but not critical for app functionality
+      }
+    };
+    fetchApiVersion();
+  }, []); // Run once on mount
 
   // Auto-focus inline edit input when it appears
   useEffect(() => {
@@ -407,6 +422,11 @@ export default function App() {
           </div>
         ))}
       </div>
+
+      {/* New: Footer with API Version */}
+      <footer className="app-footer">
+        TaskFlow Frontend v0.0.1 {apiVersion && ` | API v${apiVersion}`}
+      </footer>
     </div>
   )
 }

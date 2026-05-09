@@ -10,7 +10,7 @@ from api.tasks import router as tasks_router
 app = FastAPI(
     title="TaskFlow API",
     description="A modern task management API built with FastAPI and Firestore",
-    version="1.0.0",
+    version="1.0.1", # BUMPED VERSION to reflect new changes
 )
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
@@ -33,3 +33,9 @@ async def health_check():
         "service": "taskflow-api",
         "project": settings.PROJECT_ID,
     }
+
+# NEW: API Version Endpoint
+@app.get("/api/version")
+async def api_version():
+    """Returns the current API version."""
+    return {"version": app.version}

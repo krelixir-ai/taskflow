@@ -430,6 +430,7 @@ body {
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1.4;
+  flex-grow: 1; /* Allow title to take available space */
 }
 
 .task-card.status-done .task-title {
@@ -949,4 +950,14 @@ body::before {
 
 .confirm-dialog .modal-footer {
   justify-content: center;
+}
+
+/* ── New: Footer ──────────────────────────────────────────────────── */
+.app-footer {
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }

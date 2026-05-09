@@ -1,79 +1,87 @@
-/**
- * TaskFlow — API Client
- * Handles all HTTP requests to the FastAPI backend.
- */
-
-const API_BASE = '/api/tasks';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 export interface Task {
   id: string;
   title: string;
-  description: string | null;
+  description?: string;
   priority: 'low' | 'medium' | 'high' | 'critical';
   status: 'todo' | 'in_progress' | 'review' | 'done';
-  assignee: string | null;
+  assignee?: string;
   tags: string[];
-  due_date: string | null;
-  created_at: string;
-  updated_at: string;
+  due_date?: string; // ISO date string
+  created_at: string; // ISO datetime string
+  updated_at: string; // ISO datetime string
 }
 
-export interface TaskCreate {
-  title: string;
-  description?: string;
-  priority?: Task['priority'];
-  status?: Task['status'];
-  assignee?: string;
-  tags?: string[];
-  due_date?: string;
-}
+export type TaskCreate = Omit<Task, 'id' | 'created_at' | 'updated_at'>;
+export type TaskUpdate = Partial<TaskCreate>;
 
-export interface TaskUpdate {
-  title?: string;
-  description?: string;
-  priority?: Task['priority'];
-  status?: Task['status'];
-  assignee?: string;
-  tags?: string[];
-  due_date?: string;
-}
-
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || 'Request failed');
-  }
-  if (res.status === 204) return undefined as T;
-  return res.json();
+// NEW: Interface for API version response
+export interface ApiVersionResponse {
+  version: string;
 }
 
 export const api = {
-  listTasks: (params?: { status?: string; priority?: string }) => {
-    const qs = new URLSearchParams();
-    if (params?.status) qs.set('status', params.status);
-    if (params?.priority) qs.set('priority', params.priority);
-    const query = qs.toString();
-    return request<Task[]>(`${API_BASE}${query ? `?${query}` : ''}`);
+  listTasks: async (params?: { status?: string; priority?: string }): Promise<Task[]> => {
+    const query = new URLSearchParams();
+    if (params?.status) query.append('status', params.status);
+    if (params?.priority) query.append('priority', params.priority);
+    const response = await fetch(`${API_BASE_URL}/api/tasks?${query.toString()}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
   },
 
-  getTask: (id: string) => request<Task>(`${API_BASE}/${id}`),
+  getTask: async (id: string): Promise<Task> => {
+    const response = await fetch(`${API_BASE_URL}/api/tasks/${id}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  },
 
-  createTask: (data: TaskCreate) =>
-    request<Task>(API_BASE, {
+  createTask: async (task: TaskCreate): Promise<Task> => {
+    const response = await fetch(`${API_BASE_URL}/api/tasks`, {
       method: 'POST',
-      body: JSON.stringify(data),
-    }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(task),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  },
 
-  updateTask: (id: string, data: TaskUpdate) =>
-    request<Task>(`${API_BASE}/${id}`, {
+  updateTask: async (id: string, task: TaskUpdate): Promise<Task> => {
+    const response = await fetch(`${API_BASE_URL}/api/tasks/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
-    }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(task),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  },
 
-  deleteTask: (id: string) =>
-    request<void>(`${API_BASE}/${id}`, { method: 'DELETE' }),
+  deleteTask: async (id: string): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/api/tasks/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+  },
+
+  // NEW: Function to fetch API version
+  getApiVersion: async (): Promise<ApiVersionResponse> => {
+    const response = await fetch(`${API_BASE_URL}/api/version`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  },
 };
