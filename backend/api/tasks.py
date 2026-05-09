@@ -30,7 +30,10 @@ async def api_list_tasks(
 
 @router.get("/{task_id}", response_model=TaskResponse)
 async def api_get_task(task_id: str):
-    """Get a single task by ID."""
+    """
+    Get a single task by ID.
+    This endpoint can be used to fetch comprehensive details for a task.
+    """
     task = get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")

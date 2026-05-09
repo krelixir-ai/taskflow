@@ -381,7 +381,7 @@ export default function App() {
         />
       )}
 
-      {/* New: Task Detail Modal */}
+      {/* Task Detail Modal - Displays comprehensive information for a selected task */}
       {viewingTask && (
         <TaskDetailModal
           task={viewingTask}
