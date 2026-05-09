@@ -59,6 +59,18 @@ export default function TaskModal({ task, onClose, onSubmit }: Props) {
     }
   }
 
+  const formatDateTime = (isoString: string | undefined) => {
+    if (!isoString) return 'N/A';
+    const d = new Date(isoString);
+    return d.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
@@ -171,6 +183,19 @@ export default function TaskModal({ task, onClose, onSubmit }: Props) {
               />
             </div>
           </div>
+
+          {isEdit && task && (
+            <div className="form-row" style={{ marginTop: 'var(--space-md)' }}>
+              <div className="form-group">
+                <label className="form-label">Created At</label>
+                <p className="form-text-display">{formatDateTime(task.created_at)}</p>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Last Updated</label>
+                <p className="form-text-display">{formatDateTime(task.updated_at)}</p>
+              </div>
+            </div>
+          )}
 
           {error && (
             <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginBottom: 'var(--space-md)' }}>
