@@ -305,7 +305,7 @@ export default function App() {
                       ↩
                     </button>
                   )}
-                  {task.status !== 'todo' && ( // Only show delete button if task is not 'todo'
+                  {task.status !== 'todo' && ( // This condition already ensures the delete button is not shown for 'todo' tasks.
                     <button
                       className="btn btn-danger btn-sm btn-icon"
                       title="Delete"
