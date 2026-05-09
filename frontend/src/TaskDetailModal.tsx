@@ -18,7 +18,7 @@ export default function TaskDetailModal({ task, onClose }: Props) {
     });
   };
 
-  const formatDate = (iso: string | null) => {
+  const formatDate = (iso: string | null | undefined) => {
     if (!iso) return 'N/A';
     const d = new Date(iso);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
