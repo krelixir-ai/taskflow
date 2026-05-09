@@ -305,13 +305,15 @@ export default function App() {
                       ↩
                     </button>
                   )}
-                  <button
-                    className="btn btn-danger btn-sm btn-icon"
-                    title="Delete"
-                    onClick={() => setDeleteTarget(task)}
-                  >
-                    ✕
-                  </button>
+                  {task.status !== 'todo' && ( // Only show delete button if task is not 'todo'
+                    <button
+                      className="btn btn-danger btn-sm btn-icon"
+                      title="Delete"
+                      onClick={() => setDeleteTarget(task)}
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               </div>
               {task.description && (
