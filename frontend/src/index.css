@@ -774,6 +774,20 @@ body {
   text-overflow: ellipsis;
 }
 
+/* New: Styling for displaying tags in detail modal */
+.form-tags-display {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  background: var(--bg-input);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  min-height: 40px;
+  align-items: center;
+}
+
+
 .modal-footer {
   display: flex;
   gap: var(--space-md);

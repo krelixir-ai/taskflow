@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, Task, TaskCreate, TaskUpdate } from './api'
 import TaskModal from './TaskModal'
 import ConfirmDialog from './ConfirmDialog'
+import TaskDetailModal from './TaskDetailModal' // Import the new detail modal
 
 type StatusFilter = '' | 'todo' | 'in_progress' | 'review' | 'done'
 type ToastType = 'success' | 'error'
@@ -19,9 +20,10 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('')
   const [searchQuery, setSearchQuery] = useState('')
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [modalOpen, setModalOpen] = useState(false) // For Create/Edit Modal
+  const [editingTask, setEditingTask] = useState<Task | null>(null) // For Create/Edit Modal
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null)
+  const [viewingTask, setViewingTask] = useState<Task | null>(null) // New state for Detail Modal
   const [toasts, setToasts] = useState<Toast[]>([])
 
   // State for inline editing
@@ -73,6 +75,7 @@ export default function App() {
     await api.updateTask(editingTask.id, data as TaskUpdate)
     showToast('Task updated successfully')
     setEditingTask(null)
+    setModalOpen(false) // Close modal after update
     loadTasks()
   }
 
@@ -136,6 +139,11 @@ export default function App() {
       e.preventDefault();
       handleInlineEditCancel();
     }
+  };
+
+  // Handler for opening the detail view modal
+  const handleViewDetails = (task: Task) => {
+    setViewingTask(task);
   };
 
 
@@ -287,6 +295,14 @@ export default function App() {
                   </span>
                 )}
                 <div className="task-actions" onClick={e => e.stopPropagation()}>
+                  {/* New: View Details Button */}
+                  <button
+                    className="btn btn-ghost btn-sm btn-icon"
+                    title="View Details"
+                    onClick={() => handleViewDetails(task)}
+                  >
+                    👁️
+                  </button>
                   {task.status !== 'done' && (
                     <button
                       className="btn btn-ghost btn-sm btn-icon"
@@ -305,7 +321,7 @@ export default function App() {
                       ↩
                     </button>
                   )}
-                  {task.status !== 'todo' && ( // This condition already ensures the delete button is not shown for 'todo' tasks.
+                  {task.status !== 'todo' && (
                     <button
                       className="btn btn-danger btn-sm btn-icon"
                       title="Delete"
@@ -362,6 +378,14 @@ export default function App() {
           task={editingTask}
           onClose={() => { setModalOpen(false); setEditingTask(null) }}
           onSubmit={editingTask ? handleUpdate : handleCreate}
+        />
+      )}
+
+      {/* New: Task Detail Modal */}
+      {viewingTask && (
+        <TaskDetailModal
+          task={viewingTask}
+          onClose={() => setViewingTask(null)}
         />
       )}
 
