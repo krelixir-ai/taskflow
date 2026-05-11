@@ -3,9 +3,10 @@ import type { Task } from './api';
 interface Props {
   task: Task;
   onClose: () => void;
+  onDeleteRequest: (task: Task) => void; // New prop for delete action
 }
 
-export default function TaskDetailModal({ task, onClose }: Props) {
+export default function TaskDetailModal({ task, onClose, onDeleteRequest }: Props) {
   const formatDateTime = (isoString: string | undefined) => {
     if (!isoString) return 'N/A';
     const d = new Date(isoString);
@@ -99,6 +100,13 @@ export default function TaskDetailModal({ task, onClose }: Props) {
         </div>
 
         <div className="modal-footer">
+          <button
+            type="button"
+            className="btn btn-danger"
+            onClick={() => onDeleteRequest(task)}
+          >
+            Delete Task
+          </button>
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Close
           </button>

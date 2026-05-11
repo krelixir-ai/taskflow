@@ -330,7 +330,14 @@ export default function App() {
                       ↩
                     </button>
                   )}
-
+                  {/* NEW: Delete Button */}
+                  <button
+                    className="btn btn-ghost btn-sm btn-icon btn-ghost-danger"
+                    title="Delete Task"
+                    onClick={() => setDeleteTarget(task)}
+                  >
+                    🗑️
+                  </button>
                 </div>
               </div>
               {task.description && (
@@ -387,6 +394,10 @@ export default function App() {
         <TaskDetailModal
           task={viewingTask}
           onClose={() => setViewingTask(null)}
+          onDeleteRequest={(taskToDelete) => {
+            setViewingTask(null); // Close detail modal first
+            setDeleteTarget(taskToDelete); // Open confirm dialog
+          }}
         />
       )}
 
