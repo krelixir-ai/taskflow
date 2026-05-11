@@ -54,13 +54,19 @@ async function fetchApi<T>(
   data?: any,
   params?: Record<string, any>
 ): Promise<T> {
-  const url = new URL(`${BASE_URL}${path}`);
+  // Build the URL string — works with both absolute URLs and relative paths
+  let fullUrl = `${BASE_URL}${path}`;
   if (params) {
+    const searchParams = new URLSearchParams();
     Object.keys(params).forEach(key => {
       if (params[key] !== undefined && params[key] !== null) {
-        url.searchParams.append(key, params[key]);
+        searchParams.append(key, String(params[key]));
       }
     });
+    const qs = searchParams.toString();
+    if (qs) {
+      fullUrl += `?${qs}`;
+    }
   }
 
   const options: RequestInit = {
@@ -74,7 +80,7 @@ async function fetchApi<T>(
     options.body = JSON.stringify(data);
   }
 
-  const response = await fetch(url.toString(), options);
+  const response = await fetch(fullUrl, options);
 
   if (!response.ok) {
     let errorMessage = `HTTP error! status: ${response.status}`;
