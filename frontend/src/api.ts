@@ -42,10 +42,10 @@ export interface ApiVersionResponse {
 }
 
 // --- API Client Configuration ---
-// The BASE_URL is the most likely culprit for ERR_CONNECTION_REFUSED in a deployed environment.
-// It should be configurable via environment variables (VITE_API_BASE_URL for Vite projects).
-// For local development, it defaults to http://localhost:8000.
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// In production: empty string → relative paths → nginx proxies /api/ to backend Cloud Run
+// In local dev: empty string → relative paths → Vite proxy forwards to localhost:8080
+// Override with VITE_API_BASE_URL env var if needed for a specific backend URL
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 // Helper function for fetch requests
 async function fetchApi<T>(
