@@ -311,13 +311,7 @@ export default function App() {
                 )}
                 <div className="task-actions" onClick={e => e.stopPropagation()}>
                   {/* New: View Details Button */}
-                  <button
-                    className="btn btn-ghost btn-sm btn-icon"
-                    title="View Details"
-                    onClick={() => handleViewDetails(task)}
-                  >
-                    👁️
-                  </button>
+
                   {task.status !== 'done' && (
                     <button
                       className="btn btn-ghost btn-sm btn-icon"
@@ -336,15 +330,7 @@ export default function App() {
                       ↩
                     </button>
                   )}
-                  {task.status !== 'todo' && (
-                    <button
-                      className="btn btn-danger btn-sm btn-icon"
-                      title="Delete"
-                      onClick={() => setDeleteTarget(task)}
-                    >
-                      ✕
-                    </button>
-                  )}
+
                 </div>
               </div>
               {task.description && (
