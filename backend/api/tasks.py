@@ -17,15 +17,15 @@ async def api_create_task(payload: TaskCreate):
     return create_task(payload)
 
 
-# @router.get("", response_model=list[TaskResponse])
-# async def api_list_tasks(
-#     status: Optional[str] = Query(None, description="Filter by status"),
-#     priority: Optional[str] = Query(None, description="Filter by priority"),
-#     limit: int = Query(50, ge=1, le=200),
-#     offset: int = Query(0, ge=0),
-# ):
-#     """List all tasks with optional filters."""
-#     return list_tasks(status=status, priority=priority, limit=limit, offset=offset)
+@router.get("", response_model=list[TaskResponse])
+async def api_list_tasks(
+    status: Optional[str] = Query(None, description="Filter by status"),
+    priority: Optional[str] = Query(None, description="Filter by priority"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    """List all tasks with optional filters."""
+    return list_tasks(status=status, priority=priority, limit=limit, offset=offset)
 
 
 @router.get("/{task_id}", response_model=TaskResponse)
