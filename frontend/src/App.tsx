@@ -24,6 +24,7 @@ export default function App() {
   const [editingTask, setEditingTask] = useState<Task | null>(null) // For Create/Edit Modal
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null)
   const [viewingTask, setViewingTask] = useState<Task | null>(null) // New state for Detail Modal
+  const [loadingDetail, setLoadingDetail] = useState(false); // New state for detail modal loading
   const [toasts, setToasts] = useState<Toast[]>([])
   const [apiVersion, setApiVersion] = useState<string | null>(null); // New state for API version
 
@@ -157,9 +158,18 @@ export default function App() {
   };
 
   // Handler for opening the detail view modal
-  const handleViewDetails = (task: Task) => {
-    setViewingTask(task);
-  };
+  const handleViewDetails = useCallback(async (taskId: string) => {
+    setViewingTask(null); // Clear previous task details
+    setLoadingDetail(true);
+    try {
+      const fetchedTask = await api.getTask(taskId);
+      setViewingTask(fetchedTask);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to load task details', 'error');
+    } finally {
+      setLoadingDetail(false);
+    }
+  }, [showToast]);
 
 
   // Filter tasks client-side by search query
@@ -311,6 +321,14 @@ export default function App() {
                 )}
                 <div className="task-actions" onClick={e => e.stopPropagation()}>
                   {/* New: View Details Button */}
+                  <button
+                    className="btn btn-ghost btn-sm btn-icon"
+                    title="View Details"
+                    onClick={(e) => { e.stopPropagation(); handleViewDetails(task.id); }}
+                    disabled={loadingDetail}
+                  >
+                    👁️
+                  </button>
 
                   {task.status !== 'done' && (
                     <button
@@ -390,7 +408,7 @@ export default function App() {
       )}
 
       {/* Task Detail Modal - Displays comprehensive information for a selected task */}
-      {viewingTask && (
+      {viewingTask && !loadingDetail && (
         <TaskDetailModal
           task={viewingTask}
           onClose={() => setViewingTask(null)}
@@ -399,6 +417,13 @@ export default function App() {
             setDeleteTarget(taskToDelete); // Open confirm dialog
           }}
         />
+      )}
+
+      {/* Loading spinner for detail modal */}
+      {loadingDetail && (
+        <div className="modal-overlay">
+          <div className="loading-spinner"><div className="spinner" /></div>
+        </div>
       )}
 
       {/* Delete Confirmation */}

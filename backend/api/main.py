@@ -10,7 +10,7 @@ from api.tasks import router as tasks_router
 app = FastAPI(
     title="TaskFlow API",
     description="A modern task management API built with FastAPI and Firestore",
-    version="1.0.2", # BUMPED VERSION to reflect new changes
+    version="1.0.3", # BUMPED VERSION to reflect new changes
 )
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
