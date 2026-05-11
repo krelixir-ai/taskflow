@@ -46,38 +46,38 @@ def get_task(task_id: str) -> Optional[TaskResponse]:
 
 # ── READ (list) ──────────────────────────────────────────────────────────────
 
-# def list_tasks(
-#     status: Optional[str] = None,
-#     priority: Optional[str] = None,
-#     limit: int = 50,
-#     offset: int = 0,
-# ) -> list[TaskResponse]:
-#     """List tasks with optional filters, ordered by created_at descending."""
-#     db = get_db()
-#     query = db.collection(COLLECTION)
+def list_tasks(
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[TaskResponse]:
+    """List tasks with optional filters, ordered by created_at descending."""
+    db = get_db()
+    query = db.collection(COLLECTION)
 
-#     if status:
-#         query = query.where(filter=FieldFilter("status", "==", status))
-#     if priority:
-#         query = query.where(filter=FieldFilter("priority", "==", priority))
+    if status:
+        query = query.where(filter=FieldFilter("status", "==", status))
+    if priority:
+        query = query.where(filter=FieldFilter("priority", "==", priority))
 
-#     # Firestore requires composite indexes for where() + order_by().
-#     # If the index doesn't exist yet, fall back to client-side sort.
-#     try:
-#         ordered_query = query.order_by("created_at", direction="DESCENDING")
-#         ordered_query = ordered_query.offset(offset).limit(limit)
-#         docs = list(ordered_query.stream())
-#     except Exception:
-#         # Composite index not available — fetch without ordering, sort in Python
-#         unordered_query = query.offset(offset).limit(limit)
-#         docs = list(unordered_query.stream())
-#         docs.sort(key=lambda d: d.to_dict().get("created_at", ""), reverse=True)
+    # Firestore requires composite indexes for where() + order_by().
+    # If the index doesn't exist yet, fall back to client-side sort.
+    try:
+        ordered_query = query.order_by("created_at", direction="DESCENDING")
+        ordered_query = ordered_query.offset(offset).limit(limit)
+        docs = list(ordered_query.stream())
+    except Exception:
+        # Composite index not available — fetch without ordering, sort in Python
+        unordered_query = query.offset(offset).limit(limit)
+        docs = list(unordered_query.stream())
+        docs.sort(key=lambda d: d.to_dict().get("created_at", ""), reverse=True)
 
-#     results = []
-#     for doc in docs:
-#         d = doc.to_dict()
-#         results.append(TaskResponse(id=doc.id, **d))
-#     return results
+    results = []
+    for doc in docs:
+        d = doc.to_dict()
+        results.append(TaskResponse(id=doc.id, **d))
+    return results
 
 
 # ── UPDATE ────────────────────────────────────────────────────────────────────
