@@ -788,8 +788,8 @@ body {
   text-overflow: ellipsis;
 }
 
-/* New: Styling for displaying tags in detail modal */
-.form-tags-display {
+/* Removed: New: Styling for displaying tags in detail modal */
+/* Removed: .form-tags-display {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-xs);
@@ -799,7 +799,7 @@ body {
   border-radius: var(--radius-md);
   min-height: 40px;
   align-items: center;
-}
+} */
 
 
 .modal-footer {

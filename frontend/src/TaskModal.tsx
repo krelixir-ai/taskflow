@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import type { Task, TaskCreate, TaskUpdate } from './api'
+import type { Task, TaskCreate, TaskUpdate, TaskPriority, TaskStatus } from './api' // Added TaskPriority, TaskStatus for explicit typing
 
 interface Props {
   task: Task | null;  // null = create mode
@@ -12,8 +12,8 @@ export default function TaskModal({ task, onClose, onSubmit }: Props) {
 
   const [title, setTitle] = useState(task?.title ?? '')
   const [description, setDescription] = useState(task?.description ?? '')
-  const [priority, setPriority] = useState<Task['priority']>(task?.priority ?? 'medium')
-  const [status, setStatus] = useState<Task['status']>(task?.status ?? 'todo')
+  const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? 'medium')
+  const [status, setStatus] = useState<TaskStatus>(task?.status ?? 'todo')
   const [assignee, setAssignee] = useState(task?.assignee ?? '')
   const [tags, setTags] = useState<string[]>(task?.tags ?? [])
   const [tagInput, setTagInput] = useState('')
@@ -42,7 +42,7 @@ export default function TaskModal({ task, onClose, onSubmit }: Props) {
     setSubmitting(true)
     setError('')
     try {
-      const data: any = {
+      const data: TaskCreate | TaskUpdate = { // Explicitly type data
         title: title.trim(),
         description: description.trim() || undefined,
         priority,
@@ -111,7 +111,7 @@ export default function TaskModal({ task, onClose, onSubmit }: Props) {
                 id="task-priority"
                 className="form-select"
                 value={priority}
-                onChange={e => setPriority(e.target.value as Task['priority'])}
+                onChange={e => setPriority(e.target.value as TaskPriority)}
               >
                 <option value="low">🟢 Low</option>
                 <option value="medium">🟡 Medium</option>
@@ -125,7 +125,7 @@ export default function TaskModal({ task, onClose, onSubmit }: Props) {
                 id="task-status"
                 className="form-select"
                 value={status}
-                onChange={e => setStatus(e.target.value as Task['status'])}
+                onChange={e => setStatus(e.target.value as TaskStatus)}
               >
                 <option value="todo">📋 To Do</option>
                 <option value="in_progress">🔄 In Progress</option>

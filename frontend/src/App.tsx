@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { api, Task, TaskCreate, TaskUpdate, ApiVersionResponse } from './api' // Import ApiVersionResponse
+import { api, Task, TaskCreate, TaskUpdate, ApiVersionResponse, TaskStatus } from './api' // Import ApiVersionResponse and TaskStatus
 import TaskModal from './TaskModal'
 import ConfirmDialog from './ConfirmDialog'
-import TaskDetailModal from './TaskDetailModal' // Import the new detail modal
+// Removed: import TaskDetailModal from './TaskDetailModal'
 
 type StatusFilter = '' | 'todo' | 'in_progress' | 'review' | 'done'
 type ToastType = 'success' | 'error'
@@ -23,8 +23,8 @@ export default function App() {
   const [modalOpen, setModalOpen] = useState(false) // For Create/Edit Modal
   const [editingTask, setEditingTask] = useState<Task | null>(null) // For Create/Edit Modal
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null)
-  const [viewingTask, setViewingTask] = useState<Task | null>(null) // New state for Detail Modal
-  const [loadingDetail, setLoadingDetail] = useState(false); // New state for detail modal loading
+  // Removed: const [viewingTask, setViewingTask] = useState<Task | null>(null) // New state for Detail Modal
+  // Removed: const [loadingDetail, setLoadingDetail] = useState(false); // New state for detail modal loading
   const [toasts, setToasts] = useState<Toast[]>([])
   const [apiVersion, setApiVersion] = useState<string | null>(null); // New state for API version
 
@@ -103,7 +103,7 @@ export default function App() {
     loadTasks()
   }
 
-  const handleQuickStatusChange = async (task: Task, newStatus: Task['status']) => {
+  const handleQuickStatusChange = async (task: Task, newStatus: TaskStatus) => {
     await api.updateTask(task.id, { status: newStatus })
     showToast(`Moved to ${newStatus.replace('_', ' ')}`)
     loadTasks()
@@ -157,19 +157,8 @@ export default function App() {
     }
   };
 
-  // Handler for opening the detail view modal
-  const handleViewDetails = useCallback(async (taskId: string) => {
-    setViewingTask(null); // Clear previous task details
-    setLoadingDetail(true);
-    try {
-      const fetchedTask = await api.getTask(taskId);
-      setViewingTask(fetchedTask);
-    } catch (err: any) {
-      showToast(err.message || 'Failed to load task details', 'error');
-    } finally {
-      setLoadingDetail(false);
-    }
-  }, [showToast]);
+  // Removed: Handler for opening the detail view modal
+  // Removed: const handleViewDetails = useCallback(async (taskId: string) => { ... }, [showToast]);
 
 
   // Filter tasks client-side by search query
@@ -179,7 +168,7 @@ export default function App() {
     return (
       t.title.toLowerCase().includes(q) ||
       (t.description || '').toLowerCase().includes(q) ||
-      t.tags.some(tag => tag.toLowerCase().includes(q)) ||
+      t.tags.some((tag: string) => tag.toLowerCase().includes(q)) || // Fixed: Added type annotation for 'tag'
       (t.assignee || '').toLowerCase().includes(q)
     )
   })
@@ -320,7 +309,8 @@ export default function App() {
                   </span>
                 )}
                 <div className="task-actions" onClick={e => e.stopPropagation()}>
-                  {/* New: View Details Button */}
+                  {/* Removed: New: View Details Button */}
+                  {/* Removed:
                   <button
                     className="btn btn-ghost btn-sm btn-icon"
                     title="View Details"
@@ -329,6 +319,7 @@ export default function App() {
                   >
                     👁️
                   </button>
+                  */}
 
                   {task.status !== 'done' && (
                     <button
@@ -388,7 +379,7 @@ export default function App() {
                 {task.assignee && (
                   <span className="task-tag">👤 {task.assignee}</span>
                 )}
-                {task.tags.map(tag => (
+                {task.tags.map((tag: string) => ( // Fixed: Added type annotation for 'tag'
                   <span key={tag} className="task-tag">{tag}</span>
                 ))}
                 <span className="task-date">{formatDate(task.created_at)}</span>
@@ -407,7 +398,8 @@ export default function App() {
         />
       )}
 
-      {/* Task Detail Modal - Displays comprehensive information for a selected task */}
+      {/* Removed: Task Detail Modal - Displays comprehensive information for a selected task */}
+      {/* Removed:
       {viewingTask && !loadingDetail && (
         <TaskDetailModal
           task={viewingTask}
@@ -418,13 +410,16 @@ export default function App() {
           }}
         />
       )}
+      */}
 
-      {/* Loading spinner for detail modal */}
+      {/* Removed: Loading spinner for detail modal */}
+      {/* Removed:
       {loadingDetail && (
         <div className="modal-overlay">
           <div className="loading-spinner"><div className="spinner" /></div>
         </div>
       )}
+      */}
 
       {/* Delete Confirmation */}
       {deleteTarget && (

@@ -1,8 +1,26 @@
-// frontend/src/api.ts
-
-// --- Type Definitions ---
+// Define types directly in api.ts to resolve "Cannot find module './schemas'"
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
 export type TaskStatus = 'todo' | 'in_progress' | 'review' | 'done';
+
+export interface TaskCreate {
+  title: string;
+  description?: string;
+  priority?: TaskPriority;
+  status?: TaskStatus;
+  assignee?: string;
+  tags?: string[];
+  due_date?: string; // ISO date string
+}
+
+export interface TaskUpdate {
+  title?: string;
+  description?: string;
+  priority?: TaskPriority;
+  status?: TaskStatus;
+  assignee?: string;
+  tags?: string[];
+  due_date?: string; // ISO date string
+}
 
 export interface Task {
   id: string;
@@ -17,107 +35,74 @@ export interface Task {
   updated_at: string; // ISO datetime string
 }
 
-export interface TaskCreate {
-  title: string;
-  description?: string;
-  priority?: TaskPriority;
-  status?: TaskStatus;
-  assignee?: string;
-  tags?: string[];
-  due_date?: string;
-}
-
-export interface TaskUpdate {
-  title?: string;
-  description?: string;
-  priority?: TaskPriority;
-  status?: TaskStatus;
-  assignee?: string;
-  tags?: string[];
-  due_date?: string;
-}
-
 export interface ApiVersionResponse {
   version: string;
 }
 
-// --- API Client Configuration ---
-// In production: empty string → relative paths → nginx proxies /api/ to backend Cloud Run
-// In local dev: empty string → relative paths → Vite proxy forwards to localhost:8080
-// Override with VITE_API_BASE_URL env var if needed for a specific backend URL
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
-// Helper function for fetch requests
-async function fetchApi<T>(
-  method: string,
-  path: string,
-  data?: any,
-  params?: Record<string, any>
+async function callApi<T>(
+  endpoint: string,
+  method: string = 'GET',
+  data?: any
 ): Promise<T> {
-  // Build the URL string — works with both absolute URLs and relative paths
-  let fullUrl = `${BASE_URL}${path}`;
-  if (params) {
-    const searchParams = new URLSearchParams();
-    Object.keys(params).forEach(key => {
-      if (params[key] !== undefined && params[key] !== null) {
-        searchParams.append(key, String(params[key]));
-      }
-    });
-    const qs = searchParams.toString();
-    if (qs) {
-      fullUrl += `?${qs}`;
-    }
-  }
+  const url = `${API_BASE_URL}${endpoint}`;
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
 
-  const options: RequestInit = {
+  const config: RequestInit = {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
   };
 
   if (data) {
-    options.body = JSON.stringify(data);
+    config.body = JSON.stringify(data);
   }
 
-  const response = await fetch(fullUrl, options);
+  const response = await fetch(url, config);
 
   if (!response.ok) {
-    let errorMessage = `HTTP error! status: ${response.status}`;
-    try {
-      const errorData = await response.json();
-      errorMessage = errorData.detail || errorData.message || errorMessage;
-    } catch (e) {
-      // If response is not JSON, use default message
-    }
-    throw new Error(errorMessage);
+    const errorData = await response.json();
+    throw new Error(errorData.detail || 'Something went wrong');
   }
 
   // Handle 204 No Content for delete operations
   if (response.status === 204) {
-    return {} as T; // Return empty object for no content
+    return null as T; // Or handle as appropriate for your app
   }
 
-  return response.json();
+  return response.json() as Promise<T>;
 }
 
-// --- API Endpoints ---
 export const api = {
-  listTasks: (params?: { status?: string }) =>
-    fetchApi<Task[]>('GET', '/api/tasks', undefined, params),
+  listTasks: (params?: { status?: string; priority?: string }): Promise<Task[]> => {
+    const query = new URLSearchParams();
+    if (params?.status) query.append('status', params.status);
+    if (params?.priority) query.append('priority', params.priority);
+    const queryString = query.toString();
+    return callApi<Task[]>(`/api/tasks${queryString ? `?${queryString}` : ''}`);
+  },
 
-  getTask: (id: string) =>
-    fetchApi<Task>('GET', `/api/tasks/${id}`),
+  // The getTask API call is no longer used in the frontend after removing TaskDetailModal,
+  // but it remains available in the backend and could be used by other parts of the app.
+  getTask: (id: string): Promise<Task> => {
+    return callApi<Task>(`/api/tasks/${id}`);
+  },
 
-  createTask: (data: TaskCreate) =>
-    fetchApi<Task>('POST', '/api/tasks', data),
+  createTask: (task: TaskCreate): Promise<Task> => {
+    return callApi<Task>('/api/tasks', 'POST', task);
+  },
 
-  updateTask: (id: string, data: TaskUpdate) =>
-    fetchApi<Task>('PUT', `/api/tasks/${id}`, data),
+  updateTask: (id: string, task: TaskUpdate): Promise<Task> => {
+    return callApi<Task>(`/api/tasks/${id}`, 'PUT', task);
+  },
 
-  deleteTask: (id: string) =>
-    fetchApi<void>('DELETE', `/api/tasks/${id}`), // Assuming delete returns no content
+  deleteTask: (id: string): Promise<void> => {
+    return callApi<void>(`/api/tasks/${id}`, 'DELETE');
+  },
 
-  getApiVersion: () =>
-    fetchApi<ApiVersionResponse>('GET', '/api/version'),
+  getApiVersion: (): Promise<ApiVersionResponse> => {
+    return callApi<ApiVersionResponse>('/api/version');
+  },
 };
