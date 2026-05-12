@@ -217,7 +217,7 @@ export default function App() {
           <div className="app-logo-icon">⚡</div>
           <div>
             <h1>TaskFlow</h1>
-            <span>Manage your tasks with clarity</span>
+            <span>Manage your tasks with clarity in Todo App</span>
           </div>
         </div>
         <div className="header-actions">
