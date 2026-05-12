@@ -106,6 +106,9 @@ export const api = {
   listTasks: (params?: { status?: string }) =>
     fetchApi<Task[]>('GET', '/api/tasks', undefined, params),
 
+  getTask: (id: string) =>
+    fetchApi<Task>('GET', `/api/tasks/${id}`),
+
   createTask: (data: TaskCreate) =>
     fetchApi<Task>('POST', '/api/tasks', data),
 
