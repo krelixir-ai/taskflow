@@ -350,6 +350,19 @@ body {
   background: rgba(255, 118, 117, 0.25);
 }
 
+/* NEW: Danger-themed ghost button for icons */
+.btn-ghost-danger {
+  color: var(--danger);
+  background: rgba(255, 118, 117, 0.1); /* Light red background for hover effect */
+  border-color: rgba(255, 118, 117, 0.15);
+}
+
+.btn-ghost-danger:hover {
+  background: rgba(255, 118, 117, 0.2);
+  color: var(--danger);
+}
+
+
 .btn-sm {
   padding: var(--space-xs) var(--space-md);
   font-size: 0.8rem;
