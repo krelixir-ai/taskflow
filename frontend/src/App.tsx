@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, Task, TaskCreate, TaskUpdate, ApiVersionResponse, TaskStatus } from './api' // Import ApiVersionResponse and TaskStatus
 import TaskModal from './TaskModal'
-import ConfirmDialog from './ConfirmDialog'
+// ConfirmDialog import removed — delete functionality disabled
 
 type StatusFilter = '' | 'todo' | 'in_progress' | 'review' | 'done'
 type ToastType = 'success' | 'error'
@@ -21,7 +21,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('')
   const [modalOpen, setModalOpen] = useState(false) // For Create/Edit Modal
   const [editingTask, setEditingTask] = useState<Task | null>(null) // For Create/Edit Modal
-  const [deleteTarget, setDeleteTarget] = useState<Task | null>(null)
+
   const [toasts, setToasts] = useState<Toast[]>([])
   const [apiVersion, setApiVersion] = useState<string | null>(null); // New state for API version
 
@@ -92,13 +92,7 @@ export default function App() {
     loadTasks()
   }
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return
-    await api.deleteTask(deleteTarget.id)
-    showToast('Task deleted')
-    setDeleteTarget(null)
-    loadTasks()
-  }
+
 
   const handleQuickStatusChange = async (task: Task, newStatus: TaskStatus) => {
     await api.updateTask(task.id, { status: newStatus })
@@ -321,14 +315,7 @@ export default function App() {
                       ↩
                     </button>
                   )}
-                  {/* NEW: Delete Button */}
-                  <button
-                    className="btn btn-ghost btn-sm btn-icon btn-ghost-danger"
-                    title="Delete Task"
-                    onClick={() => setDeleteTarget(task)}
-                  >
-                    🗑️
-                  </button>
+
                 </div>
               </div>
               {task.description && (
@@ -380,15 +367,7 @@ export default function App() {
         />
       )}
 
-      {/* Delete Confirmation */}
-      {deleteTarget && (
-        <ConfirmDialog
-          title="Delete Task"
-          message={`Are you sure you want to delete "${deleteTarget.title}"? This action cannot be undone.`}
-          onConfirm={handleDelete}
-          onCancel={() => setDeleteTarget(null)}
-        />
-      )}
+
 
       {/* Toasts */}
       <div className="toast-container">
