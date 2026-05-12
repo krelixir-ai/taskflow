@@ -39,7 +39,10 @@ export interface ApiVersionResponse {
   version: string;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// In production: empty string → relative paths → nginx proxies /api/ to backend
+// In local dev: empty string → Vite proxy forwards to localhost:8080
+// Override with VITE_API_BASE_URL env var if needed
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 async function callApi<T>(
   endpoint: string,
