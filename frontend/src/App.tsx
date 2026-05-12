@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, Task, TaskCreate, TaskUpdate, ApiVersionResponse, TaskStatus } from './api' // Import ApiVersionResponse and TaskStatus
 import TaskModal from './TaskModal'
-// ConfirmDialog import removed — delete functionality disabled
+import ConfirmDialog from './ConfirmDialog' // Re-import ConfirmDialog
 
 type StatusFilter = '' | 'todo' | 'in_progress' | 'review' | 'done'
 type ToastType = 'success' | 'error'
@@ -30,6 +30,10 @@ export default function App() {
   const [inlineEditField, setInlineEditField] = useState<'title' | 'description' | null>(null);
   const [inlineEditValue, setInlineEditValue] = useState('');
   const inlineEditInputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+
+  // State for delete confirmation
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false)
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
 
 
   const showToast = useCallback((message: string, type: ToastType = 'success') => {
@@ -92,8 +96,6 @@ export default function App() {
     loadTasks()
   }
 
-
-
   const handleQuickStatusChange = async (task: Task, newStatus: TaskStatus) => {
     await api.updateTask(task.id, { status: newStatus })
     showToast(`Moved to ${newStatus.replace('_', ' ')}`)
@@ -147,6 +149,31 @@ export default function App() {
       handleInlineEditCancel();
     }
   };
+
+  // Delete functionality handlers
+  const handleDeleteClick = (task: Task) => {
+    setTaskToDelete(task)
+    setShowConfirmDelete(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!taskToDelete) return
+    try {
+      await api.deleteTask(taskToDelete.id)
+      showToast('Task deleted successfully', 'success')
+      loadTasks()
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete task', 'error')
+    } finally {
+      setShowConfirmDelete(false)
+      setTaskToDelete(null)
+    }
+  }
+
+  const handleCancelDelete = () => {
+    setShowConfirmDelete(false)
+    setTaskToDelete(null)
+  }
 
 
   // Filter tasks client-side by search query
@@ -315,7 +342,14 @@ export default function App() {
                       ↩
                     </button>
                   )}
-
+                  {/* NEW: Delete button */}
+                  <button
+                    className="btn btn-ghost btn-sm btn-icon btn-ghost-danger"
+                    title="Delete task"
+                    onClick={() => handleDeleteClick(task)}
+                  >
+                    🗑️
+                  </button>
                 </div>
               </div>
               {task.description && (
@@ -367,7 +401,15 @@ export default function App() {
         />
       )}
 
-
+      {/* NEW: Delete Confirmation Dialog */}
+      {showConfirmDelete && taskToDelete && (
+        <ConfirmDialog
+          title="Delete Task"
+          message={`Are you sure you want to delete "${taskToDelete.title}"? This action cannot be undone.`}
+          onConfirm={handleConfirmDelete}
+          onCancel={handleCancelDelete}
+        />
+      )}
 
       {/* Toasts */}
       <div className="toast-container">
