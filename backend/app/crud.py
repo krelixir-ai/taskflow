@@ -17,6 +17,31 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _normalize_doc(d: dict) -> dict:
+    """
+    Normalize a Firestore document dict to match the current TaskResponse schema.
+    Handles legacy documents that used different field names or were missing fields.
+    """
+    # Map legacy 'name' field to 'title'
+    if "title" not in d and "name" in d:
+        d["title"] = d.pop("name")
+
+    # Ensure required fields have fallback defaults for legacy documents
+    now = _now_iso()
+    d.setdefault("title", "Untitled Task")
+    d.setdefault("priority", "medium")
+    d.setdefault("status", "todo")
+    d.setdefault("tags", [])
+    d.setdefault("created_at", now)
+    d.setdefault("updated_at", now)
+
+    # Ensure tags is a list (guard against Firestore storing it differently)
+    if not isinstance(d.get("tags"), list):
+        d["tags"] = []
+
+    return d
+
+
 # ── CREATE ────────────────────────────────────────────────────────────────────
 
 def create_task(payload: TaskCreate) -> TaskResponse:
@@ -41,8 +66,11 @@ def get_task(task_id: str) -> Optional[TaskResponse]:
     doc = db.collection(COLLECTION).document(task_id).get()
     if not doc.exists:
         return None
-    d = doc.to_dict()
-    return TaskResponse(id=doc.id, **d)
+    d = _normalize_doc(doc.to_dict())
+    try:
+        return TaskResponse(id=doc.id, **d)
+    except Exception:
+        return None
 
 
 # ── READ (list) ──────────────────────────────────────────────────────────────
@@ -76,8 +104,13 @@ def list_tasks(
 
     results = []
     for doc in docs:
-        d = doc.to_dict()
-        results.append(TaskResponse(id=doc.id, **d))
+        d = _normalize_doc(doc.to_dict())
+        try:
+            results.append(TaskResponse(id=doc.id, **d))
+        except Exception as e:
+            # Skip documents that cannot be mapped even after normalization
+            import logging
+            logging.warning(f"Skipping malformed task doc {doc.id}: {e}")
     return results
 
 
