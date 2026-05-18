@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { api, Task, TaskCreate, TaskUpdate, ApiVersionResponse, TaskStatus, RedeployResponse, User, decodeAndValidateToken } from './api' // Import RedeployResponse, User, decodeAndValidateToken
+import { api, Task, TaskCreate, TaskUpdate, ApiVersionResponse, TaskStatus, RedeployResponse } from './api'
 import TaskModal from './TaskModal'
 import ConfirmDialog from './ConfirmDialog'
-import AuthModal from './AuthModal' // Import AuthModal
 
 type StatusFilter = '' | 'todo' | 'in_progress' | 'review' | 'done'
 type ToastType = 'success' | 'error'
@@ -39,11 +38,6 @@ export default function App() {
   // State for redeploy confirmation
   const [showConfirmRedeploy, setShowConfirmRedeploy] = useState(false);
 
-  // NEW: Authentication states
-  const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('authToken'));
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-
 
   const showToast = useCallback((message: string, type: ToastType = 'success') => {
     const id = ++toastId
@@ -52,72 +46,38 @@ export default function App() {
   }, [])
 
   const loadTasks = useCallback(async () => {
-    if (!authToken) {
-      setTasks([]); // Clear tasks if not authenticated
-      setLoading(false);
-      return;
-    }
     try {
       setLoading(true)
       const params: { status?: string } = {}
       if (statusFilter) params.status = statusFilter
-      const data = await api.listTasks(params, authToken) // Pass authToken
+      const data = await api.listTasks(params)
       setTasks(data)
     } catch (err: any) {
       showToast(err.message || 'Failed to load tasks', 'error')
-      if (err.message === 'Could not validate credentials') {
-        handleLogout(); // Log out if token is invalid
-        showToast('Your session has expired. Please log in again.', 'error');
-      }
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, showToast, authToken])
+  }, [statusFilter, showToast])
 
-  // NEW: Function to fetch API version, now a useCallback
+  // Function to fetch API version
   const fetchApiVersion = useCallback(async () => {
     try {
       const response = await api.getApiVersion();
       setApiVersion(response.version);
     } catch (err) {
       console.error("Failed to fetch API version:", err);
-      // Optionally show a toast, but not critical for app functionality
     }
-  }, []); // No dependencies, as it only fetches data
+  }, []);
 
-  // NEW: Effect to load user from token and fetch tasks
+  // Load tasks on mount and when filter changes
   useEffect(() => {
-    const initializeAuthAndTasks = async () => {
-      if (authToken) {
-        const decodedUser = decodeAndValidateToken(authToken);
-        if (decodedUser) {
-          try {
-            // Fetch full user details to ensure it's valid and get ID/timestamps
-            const user = await api.getCurrentUser(authToken);
-            setCurrentUser(user);
-            loadTasks();
-          } catch (err) {
-            console.error("Failed to fetch current user:", err);
-            handleLogout(); // Token might be invalid or expired on server
-            showToast('Your session is invalid. Please log in again.', 'error');
-          }
-        } else {
-          handleLogout(); // Token invalid or expired client-side
-        }
-      } else {
-        setCurrentUser(null);
-        setTasks([]); // Clear tasks if no token
-        setLoading(false);
-      }
-    };
-    initializeAuthAndTasks();
-  }, [authToken, loadTasks, showToast]);
+    loadTasks();
+  }, [loadTasks]);
 
-
-  // New: Fetch API version on component mount
+  // Fetch API version on component mount
   useEffect(() => {
     fetchApiVersion();
-  }, [fetchApiVersion]); // Add fetchApiVersion to dependency array
+  }, [fetchApiVersion]);
 
   // Auto-focus inline edit input when it appears
   useEffect(() => {
@@ -128,16 +88,15 @@ export default function App() {
 
 
   const handleCreate = async (data: TaskCreate | TaskUpdate) => {
-    if (!authToken) return;
-    await api.createTask(data as TaskCreate, authToken)
+    await api.createTask(data as TaskCreate)
     showToast('Task created successfully')
     setModalOpen(false)
     loadTasks()
   }
 
   const handleUpdate = async (data: TaskCreate | TaskUpdate) => {
-    if (!editingTask || !authToken) return
-    await api.updateTask(editingTask.id, data as TaskUpdate, authToken)
+    if (!editingTask) return
+    await api.updateTask(editingTask.id, data as TaskUpdate)
     showToast('Task updated successfully')
     setEditingTask(null)
     setModalOpen(false) // Close modal after update
@@ -145,18 +104,13 @@ export default function App() {
   }
 
   const handleQuickStatusChange = async (task: Task, newStatus: TaskStatus) => {
-    if (!authToken) return;
-    await api.updateTask(task.id, { status: newStatus }, authToken)
+    await api.updateTask(task.id, { status: newStatus })
     showToast(`Moved to ${newStatus.replace('_', ' ')}`)
     loadTasks()
   }
 
   // Inline editing handlers
   const startInlineEdit = (task: Task, field: 'title' | 'description') => {
-    if (!authToken) {
-      showToast('Please log in to edit tasks.', 'error');
-      return;
-    }
     setEditingInlineTaskId(task.id);
     setInlineEditField(field);
     setInlineEditValue(field === 'title' ? task.title : task.description || '');
@@ -167,7 +121,7 @@ export default function App() {
   };
 
   const handleInlineEditSave = async (task: Task) => {
-    if (!editingInlineTaskId || !inlineEditField || !authToken) return;
+    if (!editingInlineTaskId || !inlineEditField) return;
 
     const trimmedValue = inlineEditValue.trim();
     if (!trimmedValue && inlineEditField === 'title') {
@@ -176,7 +130,7 @@ export default function App() {
     }
 
     try {
-      await api.updateTask(task.id, { [inlineEditField]: trimmedValue }, authToken);
+      await api.updateTask(task.id, { [inlineEditField]: trimmedValue });
       showToast(`${inlineEditField} updated successfully`);
       setEditingInlineTaskId(null);
       setInlineEditField(null);
@@ -205,18 +159,14 @@ export default function App() {
 
   // Delete functionality handlers
   const handleDeleteClick = (task: Task) => {
-    if (!authToken) {
-      showToast('Please log in to delete tasks.', 'error');
-      return;
-    }
     setTaskToDelete(task)
     setShowConfirmDelete(true)
   }
 
   const handleConfirmDelete = async () => {
-    if (!taskToDelete || !authToken) return
+    if (!taskToDelete) return
     try {
-      await api.deleteTask(taskToDelete.id, authToken)
+      await api.deleteTask(taskToDelete.id)
       showToast('Task deleted successfully', 'success')
       loadTasks()
     } catch (err: any) {
@@ -234,17 +184,12 @@ export default function App() {
 
   // Redeploy functionality handlers
   const handleRedeployClick = () => {
-    if (!authToken) {
-      showToast('Please log in to redeploy the application.', 'error');
-      return;
-    }
     setShowConfirmRedeploy(true);
   };
 
   const handleConfirmRedeploy = async () => {
-    if (!authToken) return;
     try {
-      const response: RedeployResponse = await api.redeployApplication(authToken);
+      const response: RedeployResponse = await api.redeployApplication();
       showToast(response.message, 'success');
       fetchApiVersion(); // Re-fetch API version after successful redeploy
     } catch (err: any) {
@@ -258,24 +203,6 @@ export default function App() {
     setShowConfirmRedeploy(false);
   };
 
-  // NEW: Authentication handlers
-  const handleLoginSuccess = (token: string, user: User) => {
-    localStorage.setItem('authToken', token);
-    setAuthToken(token);
-    setCurrentUser(user);
-    setShowAuthModal(false);
-    showToast(`Welcome, ${user.username}!`, 'success');
-    loadTasks(); // Reload tasks after successful login
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('authToken');
-    setAuthToken(null);
-    setCurrentUser(null);
-    setTasks([]); // Clear tasks on logout
-    showToast('Logged out successfully', 'success');
-  };
-
 
   // Filter tasks client-side by search query
   const filteredTasks = tasks.filter(t => {
@@ -284,7 +211,7 @@ export default function App() {
     return (
       t.title.toLowerCase().includes(q) ||
       (t.description || '').toLowerCase().includes(q) ||
-      t.tags.some((tag: string) => tag.toLowerCase().includes(q)) || // Fixed: Added type annotation for 'tag'
+      t.tags.some((tag: string) => tag.toLowerCase().includes(q)) ||
       (t.assignee || '').toLowerCase().includes(q)
     )
   })
@@ -322,31 +249,13 @@ export default function App() {
           </div>
         </div>
         <div className="header-actions">
-          {currentUser ? (
-            <>
-              <span className="user-info">Hello, {currentUser.username}!</span>
-              <button
-                id="btn-new-task"
-                className="btn btn-primary"
-                onClick={() => { setEditingTask(null); setModalOpen(true) }}
-              >
-                ✚ New Task
-              </button>
-              <button
-                className="btn btn-ghost"
-                onClick={handleLogout}
-              >
-                Logout
-              </button>
-            </>
-          ) : (
-            <button
-              className="btn btn-primary"
-              onClick={() => setShowAuthModal(true)}
-            >
-              Login / Register
-            </button>
-          )}
+          <button
+            id="btn-new-task"
+            className="btn btn-primary"
+            onClick={() => { setEditingTask(null); setModalOpen(true) }}
+          >
+            ✚ New Task
+          </button>
         </div>
       </header>
 
@@ -380,7 +289,6 @@ export default function App() {
             placeholder="Search tasks..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            disabled={!currentUser} // Disable search if not logged in
           />
         </div>
         <div className="filter-group">
@@ -389,7 +297,6 @@ export default function App() {
               key={f.value}
               className={`filter-btn ${statusFilter === f.value ? 'active' : ''}`}
               onClick={() => setStatusFilter(f.value)}
-              disabled={!currentUser} // Disable filters if not logged in
             >
               {f.label}
             </button>
@@ -400,15 +307,6 @@ export default function App() {
       {/* Task List */}
       {loading ? (
         <div className="loading-spinner"><div className="spinner" /></div>
-      ) : !currentUser ? (
-        <div className="empty-state" id="empty-state">
-          <div className="empty-state-icon">🔒</div>
-          <h3>Authentication Required</h3>
-          <p>Please log in or register to view and manage your tasks.</p>
-          <button className="btn btn-primary" onClick={() => setShowAuthModal(true)} style={{ marginTop: 'var(--space-md)' }}>
-            Login / Register
-          </button>
-        </div>
       ) : filteredTasks.length === 0 ? (
         <div className="empty-state" id="empty-state">
           <div className="empty-state-icon">📋</div>
@@ -472,7 +370,7 @@ export default function App() {
                       ↩
                     </button>
                   )}
-                  {/* NEW: Delete button */}
+                  {/* Delete button */}
                   <button
                     className="btn btn-ghost btn-sm btn-icon btn-ghost-danger"
                     title="Delete task"
@@ -512,7 +410,7 @@ export default function App() {
                 {task.assignee && (
                   <span className="task-tag">👤 {task.assignee}</span>
                 )}
-                {task.tags.map((tag: string) => ( // Fixed: Added type annotation for 'tag'
+                {task.tags.map((tag: string) => (
                   <span key={tag} className="task-tag">{tag}</span>
                 ))}
                 <span className="task-date">{formatDate(task.created_at)}</span>
@@ -531,7 +429,7 @@ export default function App() {
         />
       )}
 
-      {/* NEW: Delete Confirmation Dialog */}
+      {/* Delete Confirmation Dialog */}
       {showConfirmDelete && taskToDelete && (
         <ConfirmDialog
           title="Delete Task"
@@ -541,21 +439,13 @@ export default function App() {
         />
       )}
 
-      {/* NEW: Redeploy Confirmation Dialog */}
+      {/* Redeploy Confirmation Dialog */}
       {showConfirmRedeploy && (
         <ConfirmDialog
           title="Redeploy Application"
           message="Are you sure you want to redeploy the application? This will restart the backend service."
           onConfirm={handleConfirmRedeploy}
           onCancel={handleCancelRedeploy}
-        />
-      )}
-
-      {/* NEW: Authentication Modal */}
-      {showAuthModal && (
-        <AuthModal
-          onClose={() => setShowAuthModal(false)}
-          onLoginSuccess={handleLoginSuccess}
         />
       )}
 
@@ -568,14 +458,13 @@ export default function App() {
         ))}
       </div>
 
-      {/* New: Footer with API Version and Redeploy Button */}
+      {/* Footer with API Version and Redeploy Button */}
       <footer className="app-footer">
         TaskFlow Frontend v0.0.2 {apiVersion && ` | API v${apiVersion}`}
         <button
           className="btn btn-ghost btn-sm"
           onClick={handleRedeployClick}
-          style={{ marginLeft: 'auto' }} // Push to the right
-          disabled={!currentUser} // Disable redeploy button if not logged in
+          style={{ marginLeft: 'auto' }}
         >
           Redeploy App
         </button>
