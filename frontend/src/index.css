@@ -161,6 +161,12 @@ body {
   align-items: center;
 }
 
+.user-info {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
 /* ── Stats Bar ────────────────────────────────────────────────────── */
 .stats-bar {
   display: grid;
@@ -960,4 +966,36 @@ body::before {
   text-align: center;
   font-size: 0.75rem;
   color: var(--text-muted);
+  display: flex; /* Added for alignment with redeploy button */
+  align-items: center; /* Added for alignment with redeploy button */
+}
+
+/* NEW: Auth Modal Specific Styles */
+.auth-tabs {
+  display: flex;
+  margin-bottom: var(--space-xl);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.auth-tab-btn {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px; /* Overlap with border-bottom */
+}
+
+.auth-tab-btn:hover {
+  color: var(--text-primary);
+}
+
+.auth-tab-btn.active {
+  color: var(--accent-primary);
+  border-bottom-color: var(--accent-primary);
 }

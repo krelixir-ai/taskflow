@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { api, Task, TaskCreate, TaskUpdate, ApiVersionResponse, TaskStatus } from './api' // Import ApiVersionResponse and TaskStatus
+import { api, Task, TaskCreate, TaskUpdate, ApiVersionResponse, TaskStatus, RedeployResponse, User, decodeAndValidateToken } from './api' // Import RedeployResponse, User, decodeAndValidateToken
 import TaskModal from './TaskModal'
-import ConfirmDialog from './ConfirmDialog' // Re-import ConfirmDialog
+import ConfirmDialog from './ConfirmDialog'
+import AuthModal from './AuthModal' // Import AuthModal
 
 type StatusFilter = '' | 'todo' | 'in_progress' | 'review' | 'done'
 type ToastType = 'success' | 'error'
@@ -23,7 +24,7 @@ export default function App() {
   const [editingTask, setEditingTask] = useState<Task | null>(null) // For Create/Edit Modal
 
   const [toasts, setToasts] = useState<Toast[]>([])
-  const [apiVersion, setApiVersion] = useState<string | null>(null); // New state for API version
+  const [apiVersion, setApiVersion] = useState<string | null>(null);
 
   // State for inline editing
   const [editingInlineTaskId, setEditingInlineTaskId] = useState<string | null>(null);
@@ -35,6 +36,14 @@ export default function App() {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
 
+  // State for redeploy confirmation
+  const [showConfirmRedeploy, setShowConfirmRedeploy] = useState(false);
+
+  // NEW: Authentication states
+  const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('authToken'));
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
 
   const showToast = useCallback((message: string, type: ToastType = 'success') => {
     const id = ++toastId
@@ -43,34 +52,72 @@ export default function App() {
   }, [])
 
   const loadTasks = useCallback(async () => {
+    if (!authToken) {
+      setTasks([]); // Clear tasks if not authenticated
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true)
       const params: { status?: string } = {}
       if (statusFilter) params.status = statusFilter
-      const data = await api.listTasks(params)
+      const data = await api.listTasks(params, authToken) // Pass authToken
       setTasks(data)
     } catch (err: any) {
       showToast(err.message || 'Failed to load tasks', 'error')
+      if (err.message === 'Could not validate credentials') {
+        handleLogout(); // Log out if token is invalid
+        showToast('Your session has expired. Please log in again.', 'error');
+      }
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, showToast])
+  }, [statusFilter, showToast, authToken])
 
-  useEffect(() => { loadTasks() }, [loadTasks])
+  // NEW: Function to fetch API version, now a useCallback
+  const fetchApiVersion = useCallback(async () => {
+    try {
+      const response = await api.getApiVersion();
+      setApiVersion(response.version);
+    } catch (err) {
+      console.error("Failed to fetch API version:", err);
+      // Optionally show a toast, but not critical for app functionality
+    }
+  }, []); // No dependencies, as it only fetches data
+
+  // NEW: Effect to load user from token and fetch tasks
+  useEffect(() => {
+    const initializeAuthAndTasks = async () => {
+      if (authToken) {
+        const decodedUser = decodeAndValidateToken(authToken);
+        if (decodedUser) {
+          try {
+            // Fetch full user details to ensure it's valid and get ID/timestamps
+            const user = await api.getCurrentUser(authToken);
+            setCurrentUser(user);
+            loadTasks();
+          } catch (err) {
+            console.error("Failed to fetch current user:", err);
+            handleLogout(); // Token might be invalid or expired on server
+            showToast('Your session is invalid. Please log in again.', 'error');
+          }
+        } else {
+          handleLogout(); // Token invalid or expired client-side
+        }
+      } else {
+        setCurrentUser(null);
+        setTasks([]); // Clear tasks if no token
+        setLoading(false);
+      }
+    };
+    initializeAuthAndTasks();
+  }, [authToken, loadTasks, showToast]);
+
 
   // New: Fetch API version on component mount
   useEffect(() => {
-    const fetchApiVersion = async () => {
-      try {
-        const response = await api.getApiVersion();
-        setApiVersion(response.version);
-      } catch (err) {
-        console.error("Failed to fetch API version:", err);
-        // Optionally show a toast, but not critical for app functionality
-      }
-    };
     fetchApiVersion();
-  }, []); // Run once on mount
+  }, [fetchApiVersion]); // Add fetchApiVersion to dependency array
 
   // Auto-focus inline edit input when it appears
   useEffect(() => {
@@ -81,15 +128,16 @@ export default function App() {
 
 
   const handleCreate = async (data: TaskCreate | TaskUpdate) => {
-    await api.createTask(data as TaskCreate)
+    if (!authToken) return;
+    await api.createTask(data as TaskCreate, authToken)
     showToast('Task created successfully')
     setModalOpen(false)
     loadTasks()
   }
 
   const handleUpdate = async (data: TaskCreate | TaskUpdate) => {
-    if (!editingTask) return
-    await api.updateTask(editingTask.id, data as TaskUpdate)
+    if (!editingTask || !authToken) return
+    await api.updateTask(editingTask.id, data as TaskUpdate, authToken)
     showToast('Task updated successfully')
     setEditingTask(null)
     setModalOpen(false) // Close modal after update
@@ -97,13 +145,18 @@ export default function App() {
   }
 
   const handleQuickStatusChange = async (task: Task, newStatus: TaskStatus) => {
-    await api.updateTask(task.id, { status: newStatus })
+    if (!authToken) return;
+    await api.updateTask(task.id, { status: newStatus }, authToken)
     showToast(`Moved to ${newStatus.replace('_', ' ')}`)
     loadTasks()
   }
 
   // Inline editing handlers
   const startInlineEdit = (task: Task, field: 'title' | 'description') => {
+    if (!authToken) {
+      showToast('Please log in to edit tasks.', 'error');
+      return;
+    }
     setEditingInlineTaskId(task.id);
     setInlineEditField(field);
     setInlineEditValue(field === 'title' ? task.title : task.description || '');
@@ -114,7 +167,7 @@ export default function App() {
   };
 
   const handleInlineEditSave = async (task: Task) => {
-    if (!editingInlineTaskId || !inlineEditField) return;
+    if (!editingInlineTaskId || !inlineEditField || !authToken) return;
 
     const trimmedValue = inlineEditValue.trim();
     if (!trimmedValue && inlineEditField === 'title') {
@@ -123,7 +176,7 @@ export default function App() {
     }
 
     try {
-      await api.updateTask(task.id, { [inlineEditField]: trimmedValue });
+      await api.updateTask(task.id, { [inlineEditField]: trimmedValue }, authToken);
       showToast(`${inlineEditField} updated successfully`);
       setEditingInlineTaskId(null);
       setInlineEditField(null);
@@ -152,14 +205,18 @@ export default function App() {
 
   // Delete functionality handlers
   const handleDeleteClick = (task: Task) => {
+    if (!authToken) {
+      showToast('Please log in to delete tasks.', 'error');
+      return;
+    }
     setTaskToDelete(task)
     setShowConfirmDelete(true)
   }
 
   const handleConfirmDelete = async () => {
-    if (!taskToDelete) return
+    if (!taskToDelete || !authToken) return
     try {
-      await api.deleteTask(taskToDelete.id)
+      await api.deleteTask(taskToDelete.id, authToken)
       showToast('Task deleted successfully', 'success')
       loadTasks()
     } catch (err: any) {
@@ -174,6 +231,50 @@ export default function App() {
     setShowConfirmDelete(false)
     setTaskToDelete(null)
   }
+
+  // Redeploy functionality handlers
+  const handleRedeployClick = () => {
+    if (!authToken) {
+      showToast('Please log in to redeploy the application.', 'error');
+      return;
+    }
+    setShowConfirmRedeploy(true);
+  };
+
+  const handleConfirmRedeploy = async () => {
+    if (!authToken) return;
+    try {
+      const response: RedeployResponse = await api.redeployApplication(authToken);
+      showToast(response.message, 'success');
+      fetchApiVersion(); // Re-fetch API version after successful redeploy
+    } catch (err: any) {
+      showToast(err.message || 'Failed to trigger redeployment', 'error');
+    } finally {
+      setShowConfirmRedeploy(false);
+    }
+  };
+
+  const handleCancelRedeploy = () => {
+    setShowConfirmRedeploy(false);
+  };
+
+  // NEW: Authentication handlers
+  const handleLoginSuccess = (token: string, user: User) => {
+    localStorage.setItem('authToken', token);
+    setAuthToken(token);
+    setCurrentUser(user);
+    setShowAuthModal(false);
+    showToast(`Welcome, ${user.username}!`, 'success');
+    loadTasks(); // Reload tasks after successful login
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    setAuthToken(null);
+    setCurrentUser(null);
+    setTasks([]); // Clear tasks on logout
+    showToast('Logged out successfully', 'success');
+  };
 
 
   // Filter tasks client-side by search query
@@ -221,13 +322,31 @@ export default function App() {
           </div>
         </div>
         <div className="header-actions">
-          <button
-            id="btn-new-task"
-            className="btn btn-primary"
-            onClick={() => { setEditingTask(null); setModalOpen(true) }}
-          >
-            ✚ New Task
-          </button>
+          {currentUser ? (
+            <>
+              <span className="user-info">Hello, {currentUser.username}!</span>
+              <button
+                id="btn-new-task"
+                className="btn btn-primary"
+                onClick={() => { setEditingTask(null); setModalOpen(true) }}
+              >
+                ✚ New Task
+              </button>
+              <button
+                className="btn btn-ghost"
+                onClick={handleLogout}
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowAuthModal(true)}
+            >
+              Login / Register
+            </button>
+          )}
         </div>
       </header>
 
@@ -261,6 +380,7 @@ export default function App() {
             placeholder="Search tasks..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
+            disabled={!currentUser} // Disable search if not logged in
           />
         </div>
         <div className="filter-group">
@@ -269,6 +389,7 @@ export default function App() {
               key={f.value}
               className={`filter-btn ${statusFilter === f.value ? 'active' : ''}`}
               onClick={() => setStatusFilter(f.value)}
+              disabled={!currentUser} // Disable filters if not logged in
             >
               {f.label}
             </button>
@@ -279,6 +400,15 @@ export default function App() {
       {/* Task List */}
       {loading ? (
         <div className="loading-spinner"><div className="spinner" /></div>
+      ) : !currentUser ? (
+        <div className="empty-state" id="empty-state">
+          <div className="empty-state-icon">🔒</div>
+          <h3>Authentication Required</h3>
+          <p>Please log in or register to view and manage your tasks.</p>
+          <button className="btn btn-primary" onClick={() => setShowAuthModal(true)} style={{ marginTop: 'var(--space-md)' }}>
+            Login / Register
+          </button>
+        </div>
       ) : filteredTasks.length === 0 ? (
         <div className="empty-state" id="empty-state">
           <div className="empty-state-icon">📋</div>
@@ -411,6 +541,24 @@ export default function App() {
         />
       )}
 
+      {/* NEW: Redeploy Confirmation Dialog */}
+      {showConfirmRedeploy && (
+        <ConfirmDialog
+          title="Redeploy Application"
+          message="Are you sure you want to redeploy the application? This will restart the backend service."
+          onConfirm={handleConfirmRedeploy}
+          onCancel={handleCancelRedeploy}
+        />
+      )}
+
+      {/* NEW: Authentication Modal */}
+      {showAuthModal && (
+        <AuthModal
+          onClose={() => setShowAuthModal(false)}
+          onLoginSuccess={handleLoginSuccess}
+        />
+      )}
+
       {/* Toasts */}
       <div className="toast-container">
         {toasts.map(t => (
@@ -420,9 +568,17 @@ export default function App() {
         ))}
       </div>
 
-      {/* New: Footer with API Version */}
+      {/* New: Footer with API Version and Redeploy Button */}
       <footer className="app-footer">
         TaskFlow Frontend v0.0.2 {apiVersion && ` | API v${apiVersion}`}
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={handleRedeployClick}
+          style={{ marginLeft: 'auto' }} // Push to the right
+          disabled={!currentUser} // Disable redeploy button if not logged in
+        >
+          Redeploy App
+        </button>
       </footer>
     </div>
   )

@@ -7,9 +7,10 @@ from typing import Optional
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.firestore_client import get_db
-from app.schemas import TaskCreate, TaskUpdate, TaskResponse
+from app.schemas import TaskCreate, TaskUpdate, TaskResponse, UserCreate, UserInDB
 
 COLLECTION = "tasks"
+USERS_COLLECTION = "users" # New collection for users
 
 
 def _now_iso() -> str:
@@ -110,3 +111,33 @@ def delete_task(task_id: str) -> bool:
         return False
     doc_ref.delete()
     return True
+
+
+# ── USER CRUD ─────────────────────────────────────────────────────────────────
+
+def get_user_by_username(username: str) -> Optional[UserInDB]:
+    """Fetch a user by username."""
+    db = get_db()
+    users_ref = db.collection(USERS_COLLECTION)
+    query = users_ref.where(filter=FieldFilter("username", "==", username)).limit(1)
+    docs = list(query.stream())
+    if not docs:
+        return None
+    user_doc = docs[0]
+    d = user_doc.to_dict()
+    return UserInDB(id=user_doc.id, **d)
+
+
+def create_user(payload: UserCreate, hashed_password: str) -> UserInDB:
+    """Create a new user document in Firestore."""
+    db = get_db()
+    now = _now_iso()
+    doc_ref = db.collection(USERS_COLLECTION).document()
+    data = {
+        "username": payload.username,
+        "hashed_password": hashed_password,
+        "created_at": now,
+        "updated_at": now,
+    }
+    doc_ref.set(data)
+    return UserInDB(id=doc_ref.id, **data)

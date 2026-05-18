@@ -1,53 +1,48 @@
-"""
-TaskFlow - Application Configuration
-Loads environment from .env or env.yaml (Cloud Run).
-"""
 import os
+from functools import lru_cache
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-def load_environment():
-    """Load .env first (for local credentials), then layer env.yaml on top."""
-    # Always try .env first — provides GOOGLE_APPLICATION_CREDENTIALS locally
-    _load_dotenv()
+class Settings(BaseSettings):
+    """
+    Application settings loaded from environment variables.
+    Uses pydantic_settings for validation and management.
+    """
 
-    # Then overlay env.yaml (used by Cloud Run; also present locally)
-    if os.path.exists("env.yaml"):
-        try:
-            import yaml
-            with open("env.yaml", "r") as f:
-                env_data = yaml.safe_load(f) or {}
-                for key, value in env_data.items():
-                    os.environ[key] = str(value)
-            print(f"[config] Layered env.yaml: {list(env_data.keys())}")
-        except ImportError:
-            print("[config] yaml module not available, skipping env.yaml")
-        except Exception as e:
-            print(f"[config] Error loading env.yaml: {e}")
+    # General
+    PROJECT_ID: str
+    FIRESTORE_DATABASE: str = "(default)"
+    CORS_ORIGINS: str = "http://localhost:5173"
+
+    # Authentication
+    SECRET_KEY: str = "dev-secret-key-change-in-production"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Split comma-separated CORS_ORIGINS string into a list."""
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",  # Ignore extra fields not defined in the schema
+    )
 
 
-def _load_dotenv():
-    try:
+@lru_cache()
+def get_settings():
+    """
+    Cached function to get application settings.
+    Ensures settings are loaded only once.
+    """
+    # For local development, load .env file
+    # In Cloud Run, environment variables are set directly.
+    if os.path.exists(".env"):
         from dotenv import load_dotenv
         load_dotenv()
-        print("[config] Loaded from .env file")
-    except ImportError:
-        print("[config] Using system environment variables")
+    return Settings()
 
 
-load_environment()
-
-
-class Settings:
-    PROJECT_ID: str = os.getenv("PROJECT_ID", "gen-ai-poc-onboarding")
-    REGION: str = os.getenv("REGION", "us-central1")
-    FIRESTORE_DATABASE: str = os.getenv("FIRESTORE_DATABASE", "taskflow-db")
-
-    # CORS
-    _cors_raw = os.getenv(
-        "CORS_ORIGINS",
-        "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
-    )
-    CORS_ORIGINS = ["*"] if "*" in _cors_raw else _cors_raw.split(",")
-
-
-settings = Settings()
+settings = get_settings()

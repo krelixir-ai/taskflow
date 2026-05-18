@@ -52,3 +52,39 @@ class TaskResponse(BaseModel):
     due_date: Optional[str] = None
     created_at: str
     updated_at: str
+
+
+# --- Authentication Schemas ---
+
+class UserBase(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50)
+
+
+class UserCreate(UserBase):
+    password: str = Field(..., min_length=6)
+
+
+class UserInDB(UserBase):
+    hashed_password: str
+    created_at: str
+    updated_at: str
+
+
+class UserResponse(UserBase):
+    id: str
+    created_at: str
+    updated_at: str
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+
+
+# --- Admin Schemas ---
+class RedeployResponse(BaseModel):
+    message: str

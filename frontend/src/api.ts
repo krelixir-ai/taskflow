@@ -1,26 +1,11 @@
-// Define types directly in api.ts to resolve "Cannot find module './schemas'"
+import { jwtDecode } from 'jwt-decode';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+
+// --- Type Definitions ---
+
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
 export type TaskStatus = 'todo' | 'in_progress' | 'review' | 'done';
-
-export interface TaskCreate {
-  title: string;
-  description?: string;
-  priority?: TaskPriority;
-  status?: TaskStatus;
-  assignee?: string;
-  tags?: string[];
-  due_date?: string; // ISO date string
-}
-
-export interface TaskUpdate {
-  title?: string;
-  description?: string;
-  priority?: TaskPriority;
-  status?: TaskStatus;
-  assignee?: string;
-  tags?: string[];
-  due_date?: string; // ISO date string
-}
 
 export interface Task {
   id: string;
@@ -35,77 +20,177 @@ export interface Task {
   updated_at: string; // ISO datetime string
 }
 
+export interface TaskCreate {
+  title: string;
+  description?: string;
+  priority?: TaskPriority;
+  status?: TaskStatus;
+  assignee?: string;
+  tags?: string[];
+  due_date?: string;
+}
+
+export interface TaskUpdate {
+  title?: string;
+  description?: string;
+  priority?: TaskPriority;
+  status?: TaskStatus;
+  assignee?: string;
+  tags?: string[];
+  due_date?: string;
+}
+
 export interface ApiVersionResponse {
   version: string;
 }
 
-// In production: empty string → relative paths → nginx proxies /api/ to backend
-// In local dev: empty string → Vite proxy forwards to localhost:8080
-// Override with VITE_API_BASE_URL env var if needed
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-
-async function callApi<T>(
-  endpoint: string,
-  method: string = 'GET',
-  data?: any
-): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-
-  const config: RequestInit = {
-    method,
-    headers,
-  };
-
-  if (data) {
-    config.body = JSON.stringify(data);
-  }
-
-  const response = await fetch(url, config);
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.detail || 'Something went wrong');
-  }
-
-  // Handle 204 No Content for delete operations
-  if (response.status === 204) {
-    return null as T; // Or handle as appropriate for your app
-  }
-
-  return response.json() as Promise<T>;
+export interface RedeployResponse {
+  message: string;
 }
 
+// Authentication types
+export interface User {
+  id: string;
+  username: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LoginPayload {
+  username: string;
+  password: string;
+}
+
+export interface RegisterPayload {
+  username: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+}
+
+interface DecodedToken {
+  sub: string; // username
+  exp: number; // expiration timestamp
+}
+
+export const decodeAndValidateToken = (token: string | null): User | null => {
+  if (!token) return null;
+  try {
+    const decoded = jwtDecode<DecodedToken>(token);
+    if (decoded.exp * 1000 < Date.now()) {
+      // Token expired
+      console.warn("Token expired.");
+      return null;
+    }
+    // For simplicity, we'll just return a User-like object with username from token
+    // In a real app, you might fetch full user details or store more in the token
+    return { id: 'unknown', username: decoded.sub, created_at: '', updated_at: '' };
+  } catch (error) {
+    console.error("Failed to decode or validate token:", error);
+    return null;
+  }
+};
+
+
+// --- API Client ---
+
+const handleResponse = async (response: Response) => {
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || response.statusText || 'Something went wrong');
+  }
+  return response.json();
+};
+
+const getAuthHeaders = (token: string) => ({
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${token}`,
+});
+
 export const api = {
-  listTasks: (params?: { status?: string; priority?: string }): Promise<Task[]> => {
-    const query = new URLSearchParams();
-    if (params?.status) query.append('status', params.status);
-    if (params?.priority) query.append('priority', params.priority);
-    const queryString = query.toString();
-    return callApi<Task[]>(`/api/tasks${queryString ? `?${queryString}` : ''}`);
+  // Tasks
+  listTasks: async (params: { status?: string }, token: string): Promise<Task[]> => {
+    const query = new URLSearchParams(params).toString();
+    const response = await fetch(`${API_BASE_URL}/tasks?${query}`, {
+      headers: getAuthHeaders(token),
+    });
+    return handleResponse(response);
   },
 
-  // The getTask API call is no longer used in the frontend after removing TaskDetailModal,
-  // but it remains available in the backend and could be used by other parts of the app.
-  getTask: (id: string): Promise<Task> => {
-    return callApi<Task>(`/api/tasks/${id}`);
+  createTask: async (task: TaskCreate, token: string): Promise<Task> => {
+    const response = await fetch(`${API_BASE_URL}/tasks`, {
+      method: 'POST',
+      headers: getAuthHeaders(token),
+      body: JSON.stringify(task),
+    });
+    return handleResponse(response);
   },
 
-  createTask: (task: TaskCreate): Promise<Task> => {
-    return callApi<Task>('/api/tasks', 'POST', task);
+  updateTask: async (id: string, task: TaskUpdate, token: string): Promise<Task> => {
+    const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(token),
+      body: JSON.stringify(task),
+    });
+    return handleResponse(response);
   },
 
-  updateTask: (id: string, task: TaskUpdate): Promise<Task> => {
-    return callApi<Task>(`/api/tasks/${id}`, 'PUT', task);
+  deleteTask: async (id: string, token: string): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(token),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || response.statusText || 'Failed to delete task');
+    }
   },
 
-  deleteTask: (id: string): Promise<void> => {
-    return callApi<void>(`/api/tasks/${id}`, 'DELETE');
+  // Authentication
+  register: async (payload: RegisterPayload): Promise<User> => {
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse(response);
   },
 
-  getApiVersion: (): Promise<ApiVersionResponse> => {
-    return callApi<ApiVersionResponse>('/api/version');
+  login: async (payload: LoginPayload): Promise<AuthResponse> => {
+    const formBody = new URLSearchParams();
+    formBody.append('username', payload.username);
+    formBody.append('password', payload.password);
+
+    const response = await fetch(`${API_BASE_URL}/auth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formBody.toString(),
+    });
+    return handleResponse(response);
+  },
+
+  getCurrentUser: async (token: string): Promise<User> => {
+    const response = await fetch(`${API_BASE_URL}/auth/me`, {
+      headers: getAuthHeaders(token),
+    });
+    return handleResponse(response);
+  },
+
+  // General
+  getApiVersion: async (): Promise<ApiVersionResponse> => {
+    const response = await fetch(`${API_BASE_URL}/version`);
+    return handleResponse(response);
+  },
+
+  // Admin
+  redeployApplication: async (token: string): Promise<RedeployResponse> => {
+    const response = await fetch(`${API_BASE_URL}/admin/redeploy`, {
+      method: 'POST',
+      headers: getAuthHeaders(token),
+    });
+    return handleResponse(response);
   },
 };
